@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 #
-# Online one-liner install (Ubuntu/Debian + systemd): official release tarball for
+# Online one-liner install (apt or dnf/yum + systemd): official release tarball for
 # assets/xray + your Git fork compiled on-server with CGO (SQLite OK).
+#
+# Defaults (API-only, low profile on disk):
+#   XUI_MAIN_FOLDER=/usr/local/panel-srv   XUI_PANEL_BINARY=svc-core
+#   XUI_DB_FOLDER=/etc/panel-srv          XUI_LOG_FOLDER=/var/log/panel-srv
+#   XUI_INSTALL_CLI_MENU=0  (no /usr/bin/x-ui menu; set to 1 to restore it)
+#   XUI_WEB_BASE_PATH=adV5YHG8JvMcm4rm5y  (URL segment; becomes /SEGMENT/ in DB; override or set empty to skip)
 #
 # Usage (replace YOUR_REPO):
 #   export XUI_GIT_REPO='https://github.com/YOUR_ACCOUNT/3x-ui.git'
@@ -22,7 +28,17 @@ plain='\033[0m'
     exit 1
 }
 
-XUI_FOLDER="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
+# Neutral on-disk layout (no "x-ui" in paths). Override any time before running.
+XUI_FOLDER="${XUI_MAIN_FOLDER:-/usr/local/panel-srv}"
+XUI_DB_FOLDER="${XUI_DB_FOLDER:-/etc/panel-srv}"
+XUI_LOG_FOLDER="${XUI_LOG_FOLDER:-/var/log/panel-srv}"
+# Installed daemon binary basename (executable file name under XUI_FOLDER).
+XUI_PANEL_BINARY="${XUI_PANEL_BINARY:-svc-core}"
+# Do not install /usr/bin/x-ui menu helper unless explicitly enabled.
+XUI_INSTALL_CLI_MENU="${XUI_INSTALL_CLI_MENU:-0}"
+# Fixed web URL prefix (no leading/trailing slashes here). Results in webBasePath /SEGMENT/ in DB.
+XUI_WEB_BASE_PATH="${XUI_WEB_BASE_PATH:-adV5YHG8JvMcm4rm5y}"
+
 XUI_SERVICE_DIR="${XUI_SERVICE:=/etc/systemd/system}"
 
 if [[ "${1:-}" =~ ^https?:// ]]; then
@@ -47,11 +63,50 @@ if [[ ! -f /etc/os-release ]]; then
 fi
 # shellcheck source=/dev/null
 source /etc/os-release
-case "${ID:-}${ID_LIKE:-}" in *debian*|*ubuntu*) ;;
-    *)
-        echo -e "${yellow}This script targets apt-based Debian/Ubuntu; continuing.${plain}"
-        ;;
-esac
+
+if ! command -v apt-get >/dev/null 2>&1 &&
+   ! command -v dnf >/dev/null 2>&1 &&
+   ! command -v yum >/dev/null 2>&1 &&
+   ! command -v microdnf >/dev/null 2>&1 &&
+   ! command -v apk >/dev/null 2>&1
+then
+    echo -e "${red}No supported package manager found (need apt-get, dnf, yum, microdnf, or apk).${plain}" >&2
+    exit 1
+fi
+
+install_build_dependencies() {
+    echo -e "${green}[1/6] Build dependencies (C toolchain + SQLite for CGO)...${plain}"
+    if command -v apt-get >/dev/null 2>&1; then
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -qq
+        apt-get install -y -qq curl ca-certificates tar git gcc g++ libc6-dev pkg-config \
+            sqlite3 libsqlite3-dev openssl make xz-utils >/dev/null
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y curl ca-certificates tar git gcc gcc-c++ pkg-config \
+            sqlite sqlite-devel openssl make xz >/dev/null
+        command -v openssl >/dev/null 2>&1 || dnf install -y openssl >/dev/null 2>&1
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y curl ca-certificates tar git gcc gcc-c++ pkg-config \
+            sqlite sqlite-devel openssl make xz >/dev/null
+        command -v openssl >/dev/null 2>&1 || yum install -y openssl >/dev/null 2>&1
+    elif command -v microdnf >/dev/null 2>&1; then
+        microdnf install -y curl ca-certificates tar git gcc gcc-c++ pkg-config \
+            sqlite sqlite-devel openssl make xz >/dev/null
+        command -v openssl >/dev/null 2>&1 || microdnf install -y openssl >/dev/null 2>&1
+    elif command -v apk >/dev/null 2>&1; then
+        apk update -q
+        apk add --no-cache curl ca-certificates tar git gcc musl-dev g++ pkgconf \
+            sqlite sqlite-dev openssl make xz >/dev/null
+    else
+        echo -e "${red}No supported package manager found.${plain}" >&2
+        exit 1
+    fi
+
+    command -v git >/dev/null 2>&1 && command -v gcc >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 || {
+        echo -e "${red}Dependency install incomplete (need git, gcc, curl). Re-run manually or inspect repo mirrors.${plain}" >&2
+        exit 1
+    }
+}
 
 arch_slug() {
     case "$(uname -m)" in
@@ -75,7 +130,7 @@ gen_random_string() {
     openssl rand -base64 $((length * 2)) 2>/dev/null | tr -dc 'a-zA-Z0-9' | head -c "$length"
 }
 
-ensure_x_ui_api_env_defaults() {
+ensure_x_ui_env_file() {
     local env_file="/etc/default/x-ui"
     umask 077
     mkdir -p /etc/default 2>/dev/null || true
@@ -91,6 +146,23 @@ ensure_x_ui_api_env_defaults() {
         printf '%s\n' "XUI_API_SECRET=${api_secret}" >> "$env_file"
         echo -e "${green}XUI_API_SECRET written to ${env_file}${plain}"
     fi
+    if ! grep -qs '^[[:space:]]*XUI_DB_FOLDER=' "$env_file" 2>/dev/null; then
+        printf '%s\n' "XUI_DB_FOLDER=${XUI_DB_FOLDER}" >> "$env_file"
+    fi
+    if ! grep -qs '^[[:space:]]*XUI_LOG_FOLDER=' "$env_file" 2>/dev/null; then
+        printf '%s\n' "XUI_LOG_FOLDER=${XUI_LOG_FOLDER}" >> "$env_file"
+    fi
+}
+
+patch_systemd_unit_paths() {
+    local unit="$1"
+    [[ -f "$unit" ]] || return 0
+    # shellcheck disable=SC2016
+    sed -i \
+        -e 's/^Description=.*/Description=Panel core service/' \
+        -e "s|^WorkingDirectory=.*|WorkingDirectory=${XUI_FOLDER}/|" \
+        -e "s|^ExecStart=.*|ExecStart=${XUI_FOLDER%/}/${XUI_PANEL_BINARY}|" \
+        "$unit"
 }
 
 github_raw_prefix() {
@@ -102,11 +174,7 @@ github_raw_prefix() {
     fi
 }
 
-echo -e "${green}[1/6] Apt dependencies (build + sqlite dev)...${plain}"
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq curl ca-certificates tar git gcc g++ libc6-dev pkg-config \
-    sqlite3 libsqlite3-dev openssl make xz-utils >/dev/null
+install_build_dependencies
 
 WORKDIR="$(mktemp -d /tmp/xui-build-online.XXXXXX)"
 cleanup() { rm -rf "$WORKDIR" ; }
@@ -170,7 +238,7 @@ else
         -o "${WORKDIR}/x-ui-panel-custom" .
 fi
 
-install -m 755 "${WORKDIR}/x-ui-panel-custom" "${XUI_FOLDER}/x-ui"
+install -m 755 "${WORKDIR}/x-ui-panel-custom" "${XUI_FOLDER}/${XUI_PANEL_BINARY}"
 
 if [[ "${SLUG}" == armv5 || "${SLUG}" == armv6 || "${SLUG}" == armv7 ]]; then
     if [[ -f "${XUI_FOLDER}/bin/xray-linux-${SLUG}" ]]; then
@@ -190,28 +258,60 @@ else
     chmod 644 "${XUI_SERVICE_DIR}/x-ui.service"
 fi
 
-mkdir -p /var/log/x-ui
+patch_systemd_unit_paths "${XUI_SERVICE_DIR}/x-ui.service"
 
-ensure_x_ui_api_env_defaults
+mkdir -p "${XUI_LOG_FOLDER}"
+chmod 755 "${XUI_LOG_FOLDER}" 2>/dev/null || true
+mkdir -p "${XUI_DB_FOLDER}"
+chmod 700 "${XUI_DB_FOLDER}" 2>/dev/null || true
 
-echo -e "${green}[6/6] migrate + systemd...${plain}"
-"${XUI_FOLDER}/x-ui" migrate
+ensure_x_ui_env_file
+
+strip_web_segment() {
+    local s="${1:-}"
+    s="${s#/}"
+    s="${s%/}"
+    printf '%s' "$s"
+}
+
+echo -e "${green}[6/6] migrate + fixed webBasePath + systemd...${plain}"
+"${XUI_FOLDER}/${XUI_PANEL_BINARY}" migrate
+
+WB_SEGMENT="$(strip_web_segment "${XUI_WEB_BASE_PATH:-}")"
+if [[ -n "${WB_SEGMENT}" ]]; then
+    echo -e "${green}webBasePath -> /${WB_SEGMENT}/${plain}"
+    "${XUI_FOLDER}/${XUI_PANEL_BINARY}" setting -webBasePath "${WB_SEGMENT}"
+else
+    echo -e "${yellow}(info) XUI_WEB_BASE_PATH empty — leaving existing webBasePath in DB.${plain}"
+fi
+
 systemctl daemon-reload
 systemctl enable x-ui >/dev/null
 systemctl restart x-ui
 
-RAW_BASE="$(github_raw_prefix "${XUI_GIT_REPO}" "${XUI_GIT_BRANCH}")"
-if [[ -n "${RAW_BASE:-}" ]] && curl -fsSL "${RAW_BASE}/x-ui.sh" -o /usr/bin/x-ui 2>/dev/null; then
-    chmod +x /usr/bin/x-ui
+if [[ "${XUI_INSTALL_CLI_MENU}" == "1" || "${XUI_INSTALL_CLI_MENU}" == "true" ]]; then
+    RAW_BASE="$(github_raw_prefix "${XUI_GIT_REPO}" "${XUI_GIT_BRANCH}")"
+    if [[ -n "${RAW_BASE:-}" ]] && curl -fsSL "${RAW_BASE}/x-ui.sh" -o /usr/bin/x-ui 2>/dev/null; then
+        chmod +x /usr/bin/x-ui
+    else
+        echo -e "${yellow}(info) Installing upstream x-ui menu script (fork x-ui.sh not at ${RAW_BASE:-N/A})${plain}"
+        curl -fsSL -o /usr/bin/x-ui https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
+        chmod +x /usr/bin/x-ui
+    fi
 else
-    echo -e "${yellow}(info) Installing upstream x-ui menu script (fork x-ui.sh not at ${RAW_BASE:-N/A})${plain}"
-    curl -fsSL -o /usr/bin/x-ui https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
-    chmod +x /usr/bin/x-ui
+    rm -f /usr/bin/x-ui 2>/dev/null || true
+    echo -e "${yellow}(info) Skipped interactive CLI (/usr/bin/x-ui). Set XUI_INSTALL_CLI_MENU=1 to install.${plain}"
 fi
 
 echo ""
 echo -e "${green}Done.${plain} systemctl status x-ui --no-pager"
+if [[ -n "${WB_SEGMENT}" ]]; then
+    echo -e "${yellow}API example:${plain} http://<IP>:<端口>/${WB_SEGMENT}/panel/api/server/status"
+else
+    echo -e "${yellow}API example:${plain} http://<IP>:<端口>/panel/api/server/status ${yellow}(webBasePath '/')${plain}"
+fi
+echo -e "${yellow}Install: ${plain}${XUI_FOLDER}/${XUI_PANEL_BINARY}${yellow} (DB dir ${XUI_DB_FOLDER}, logs ${XUI_LOG_FOLDER})${plain}"
 echo -e "${yellow}API env (${plain}/etc/default/x-ui${yellow}):${plain}"
-grep -E '^XUI_API' /etc/default/x-ui || true
+grep -E '^XUI_' /etc/default/x-ui || true
 echo ""
-"${XUI_FOLDER}/x-ui" setting -show true 2>/dev/null || echo -e "${yellow}(setting -show unavailable until DB settles — check journalctl -u x-ui)${plain}"
+"${XUI_FOLDER}/${XUI_PANEL_BINARY}" setting -show true 2>/dev/null || echo -e "${yellow}(setting -show unavailable until DB settles — check journalctl -u x-ui)${plain}"

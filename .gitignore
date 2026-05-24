@@ -38,6 +38,10 @@ x-ui.db
 x-ui.db-shm
 x-ui.db-wal
 
+# Python
+__pycache__/
+*.py[cod]
+
 # Ignore Docker specific files
 docker-compose.override.yml
 

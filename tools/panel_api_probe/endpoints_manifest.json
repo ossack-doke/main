@@ -1,0 +1,41 @@
+[
+  {"method": "GET", "path": "/panel/api/inbounds/list"},
+  {"method": "GET", "path": "/panel/api/inbounds/options"},
+  {"method": "GET", "path": "/panel/api/inbounds/get/:id", "need_inbound_id": true},
+  {"method": "GET", "path": "/panel/api/inbounds/:id/fallbacks", "need_inbound_id": true},
+
+  {"method": "GET", "path": "/panel/api/server/status"},
+  {"method": "GET", "path": "/panel/api/server/cpuHistory/:bucket", "bucket": true},
+  {"method": "GET", "path": "/panel/api/server/history/:metric/:bucket", "metric": true, "bucket": true},
+  {"method": "GET", "path": "/panel/api/server/xrayMetricsState"},
+  {"method": "GET", "path": "/panel/api/server/xrayMetricsHistory/:metric/:bucket", "metric": true, "bucket": true},
+  {"method": "GET", "path": "/panel/api/server/xrayObservatory"},
+  {"method": "GET", "path": "/panel/api/server/xrayObservatoryHistory/:tag/:bucket", "tag_placeholder": "__direct__", "bucket": true},
+  {"method": "GET", "path": "/panel/api/server/getXrayVersion"},
+  {"method": "GET", "path": "/panel/api/server/getPanelUpdateInfo"},
+  {"method": "GET", "path": "/panel/api/server/getConfigJson"},
+  {"method": "GET", "path": "/panel/api/server/getDb", "notes": "downloads sqlite"},
+  {"method": "GET", "path": "/panel/api/server/getNewUUID"},
+  {"method": "GET", "path": "/panel/api/server/getNewX25519Cert"},
+  {"method": "GET", "path": "/panel/api/server/getNewmldsa65"},
+  {"method": "GET", "path": "/panel/api/server/getNewmlkem768"},
+  {"method": "GET", "path": "/panel/api/server/getNewVlessEnc"},
+
+  {"method": "GET", "path": "/panel/api/clients/list"},
+  {"method": "GET", "path": "/panel/api/clients/get/:email", "need_client_email": true},
+  {"method": "GET", "path": "/panel/api/clients/ips/:email", "need_client_email": true},
+  {"method": "GET", "path": "/panel/api/clients/traffic/:email", "need_client_email": true},
+  {"method": "GET", "path": "/panel/api/clients/subLinks/:subId", "need_sub_id": true},
+  {"method": "GET", "path": "/panel/api/clients/links/:email", "need_client_email": true},
+
+  {"method": "GET", "path": "/panel/api/nodes/list"},
+  {"method": "GET", "path": "/panel/api/nodes/get/:id", "need_node_id": true},
+  {"method": "GET", "path": "/panel/api/nodes/history/:id/:metric/:bucket", "need_node_id": true, "metric": true, "bucket": true},
+
+  {"method": "GET", "path": "/panel/api/custom-geo/list"},
+  {"method": "GET", "path": "/panel/api/custom-geo/aliases"},
+  {"method": "GET", "path": "/panel/api/custom-geo/download/:id", "need_geo_id": true},
+
+  {"method": "POST", "path": "/panel/api/clients/onlines", "body": {}, "risk": "read"},
+  {"method": "POST", "path": "/panel/api/clients/lastOnline", "body": {}, "risk": "read"}
+]

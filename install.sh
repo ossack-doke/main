@@ -900,10 +900,14 @@ install_x-ui() {
             exit 1
         fi
     fi
-    curl -4fLRo /usr/bin/x-ui-temp https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
-    if [[ $? -ne 0 ]]; then
-        echo -e "${red}Failed to download x-ui.sh${plain}"
-        exit 1
+    if [[ "${XUI_INSTALL_CLI_MENU:-1}" != "0" ]]; then
+        curl -4fLRo /usr/bin/x-ui-temp https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
+        if [[ $? -ne 0 ]]; then
+            echo -e "${red}Failed to download x-ui.sh${plain}"
+            exit 1
+        fi
+    else
+        echo -e "${yellow}Skipping ${plain}/usr/bin/x-ui menu (XUI_INSTALL_CLI_MENU=0)${yellow}.${plain}"
     fi
 
     # Stop x-ui service and remove old resources
@@ -931,9 +935,13 @@ install_x-ui() {
     fi
     chmod +x x-ui bin/xray-linux-$(arch)
 
-    # Update x-ui cli and se set permission
-    mv -f /usr/bin/x-ui-temp /usr/bin/x-ui
-    chmod +x /usr/bin/x-ui
+    # Update x-ui cli and set permission (optional)
+    if [[ "${XUI_INSTALL_CLI_MENU:-1}" != "0" ]]; then
+        mv -f /usr/bin/x-ui-temp /usr/bin/x-ui
+        chmod +x /usr/bin/x-ui
+    else
+        rm -f /usr/bin/x-ui-temp /usr/bin/x-ui 2>/dev/null || true
+    fi
     mkdir -p /var/log/x-ui
     config_after_install
 
