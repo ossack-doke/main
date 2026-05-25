@@ -45,5 +45,8 @@ __pycache__/
 # Ignore Docker specific files
 docker-compose.override.yml
 
+# Local-only docs (not for GitHub)
+LOCAL_PANEL_GUIDE_zh.md
+
 # Ignore .env (Environment Variables) file
 .env

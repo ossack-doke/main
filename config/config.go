@@ -35,7 +35,7 @@ func GetVersion() string {
 	return strings.TrimSpace(version)
 }
 
-// GetName returns the name of the 3x-ui application.
+// GetName returns the short product codename baked into embed `config/name` (session/cookie/logging).
 func GetName() string {
 	return strings.TrimSpace(name)
 }

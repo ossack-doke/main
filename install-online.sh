@@ -6,7 +6,7 @@
 # Defaults (API-only, low profile on disk):
 #   XUI_MAIN_FOLDER=/usr/local/panel-srv   XUI_PANEL_BINARY=svc-core
 #   XUI_DB_FOLDER=/etc/panel-srv          XUI_LOG_FOLDER=/var/log/panel-srv
-#   XUI_INSTALL_CLI_MENU=0  (no /usr/bin/x-ui menu; set to 1 to restore it)
+#   XUI_INSTALL_CLI_MENU=1  (install /usr/bin/x-ui menu; set 0/false to skip)
 #   XUI_WEB_BASE_PATH=adV5YHG8JvMcm4rm5y  (URL segment; becomes /SEGMENT/ in DB; override or set empty to skip)
 #
 # Usage (replace YOUR_REPO):
@@ -34,8 +34,8 @@ XUI_DB_FOLDER="${XUI_DB_FOLDER:-/etc/panel-srv}"
 XUI_LOG_FOLDER="${XUI_LOG_FOLDER:-/var/log/panel-srv}"
 # Installed daemon binary basename (executable file name under XUI_FOLDER).
 XUI_PANEL_BINARY="${XUI_PANEL_BINARY:-svc-core}"
-# Do not install /usr/bin/x-ui menu helper unless explicitly enabled.
-XUI_INSTALL_CLI_MENU="${XUI_INSTALL_CLI_MENU:-0}"
+# Interactive menu at /usr/bin/x-ui (set XUI_INSTALL_CLI_MENU=0 to skip).
+XUI_INSTALL_CLI_MENU="${XUI_INSTALL_CLI_MENU:-1}"
 # Fixed web URL prefix (no leading/trailing slashes here). Results in webBasePath /SEGMENT/ in DB.
 XUI_WEB_BASE_PATH="${XUI_WEB_BASE_PATH:-adV5YHG8JvMcm4rm5y}"
 
@@ -151,6 +151,12 @@ ensure_x_ui_env_file() {
     fi
     if ! grep -qs '^[[:space:]]*XUI_LOG_FOLDER=' "$env_file" 2>/dev/null; then
         printf '%s\n' "XUI_LOG_FOLDER=${XUI_LOG_FOLDER}" >> "$env_file"
+    fi
+    if ! grep -qs '^[[:space:]]*XUI_MAIN_FOLDER=' "$env_file" 2>/dev/null; then
+        printf '%s\n' "XUI_MAIN_FOLDER=${XUI_FOLDER}" >> "$env_file"
+    fi
+    if ! grep -qs '^[[:space:]]*XUI_PANEL_BINARY=' "$env_file" 2>/dev/null; then
+        printf '%s\n' "XUI_PANEL_BINARY=${XUI_PANEL_BINARY}" >> "$env_file"
     fi
 }
 
@@ -300,7 +306,7 @@ if [[ "${XUI_INSTALL_CLI_MENU}" == "1" || "${XUI_INSTALL_CLI_MENU}" == "true" ]]
     fi
 else
     rm -f /usr/bin/x-ui 2>/dev/null || true
-    echo -e "${yellow}(info) Skipped interactive CLI (/usr/bin/x-ui). Set XUI_INSTALL_CLI_MENU=1 to install.${plain}"
+    echo -e "${yellow}(info) Skipped interactive CLI (/usr/bin/x-ui). Defaults install it; omit XUI_INSTALL_CLI_MENU or set to 1 to install next run.${plain}"
 fi
 
 echo ""

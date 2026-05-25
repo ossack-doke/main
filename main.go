@@ -493,7 +493,7 @@ func main() {
 		fmt.Println()
 		fmt.Println("Commands:")
 		fmt.Println("    run            run web panel")
-		fmt.Println("    migrate        migrate form other/old x-ui")
+		fmt.Println("    migrate        migrate from another/old SQLite deployment")
 		fmt.Println("    migrate-db     copy data from the SQLite file into a PostgreSQL database")
 		fmt.Println("    setting        set settings")
 	}

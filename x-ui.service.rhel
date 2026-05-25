@@ -1,14 +1,18 @@
 [Unit]
-Description=x-ui Service
+Description=Panel core service
 After=network.target
 Wants=network.target
 
+# Fork / install-online.sh 默认：`/usr/local/panel-srv` + `svc-core`。（在线安装通常仍会装 debian 版 unit；
+# RHEL/Alpine 等若直接使用本模板，可同时放一份变量到 `/etc/default/x-ui` 或改写 EnvironmentFile。）
+
 [Service]
+EnvironmentFile=-/etc/default/x-ui
 EnvironmentFile=-/etc/sysconfig/x-ui
 Environment="XRAY_VMESS_AEAD_FORCED=false"
 Type=simple
-WorkingDirectory=/usr/local/x-ui/
-ExecStart=/usr/local/x-ui/x-ui
+WorkingDirectory=/usr/local/panel-srv/
+ExecStart=/usr/local/panel-srv/svc-core
 ExecReload=kill -USR1 $MAINPID
 Restart=on-failure
 RestartSec=5s

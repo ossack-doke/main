@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mhsanaei/3x-ui/v3/config"
 	"github.com/mhsanaei/3x-ui/v3/database"
 	"github.com/mhsanaei/3x-ui/v3/database/model"
 	"github.com/mhsanaei/3x-ui/v3/logger"
@@ -14,10 +15,9 @@ import (
 )
 
 const (
-	loginUserKey      = "LOGIN_USER"
-	loginEpochKey     = "LOGIN_EPOCH"
-	apiAuthUserKey    = "api_auth_user"
-	sessionCookieName = "3x-ui"
+	loginUserKey   = "LOGIN_USER"
+	loginEpochKey  = "LOGIN_EPOCH"
+	apiAuthUserKey = "api_auth_user"
 )
 
 func init() {
@@ -179,7 +179,7 @@ func ClearSession(c *gin.Context) error {
 	}
 	if cookiePath != "/" {
 		http.SetCookie(c.Writer, &http.Cookie{
-			Name:     sessionCookieName,
+			Name:     config.GetName(),
 			Value:    "",
 			Path:     "/",
 			MaxAge:   -1,

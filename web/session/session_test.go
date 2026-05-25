@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/mhsanaei/3x-ui/v3/config"
 	"github.com/mhsanaei/3x-ui/v3/database/model"
 
 	"github.com/gin-contrib/sessions"
@@ -15,7 +16,7 @@ import (
 func TestSetLoginUserStoresOnlyUserID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(sessions.Sessions(sessionCookieName, cookie.NewStore([]byte("01234567890123456789012345678901"))))
+	router.Use(sessions.Sessions(config.GetName(), cookie.NewStore([]byte("01234567890123456789012345678901"))))
 	router.GET("/", func(c *gin.Context) {
 		if err := SetLoginUser(c, &model.User{Id: 7, Username: "admin", Password: "hash"}); err != nil {
 			t.Fatal(err)

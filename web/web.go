@@ -190,7 +190,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 		sessionOptions.MaxAge = sessionMaxAge * 60 // minutes -> seconds
 	}
 	store.Options(sessionOptions)
-	engine.Use(sessions.Sessions("3x-ui", store))
+	engine.Use(sessions.Sessions(config.GetName(), store))
 	engine.Use(func(c *gin.Context) {
 		c.Set("base_path", basePath)
 	})
@@ -396,9 +396,9 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	}
 
 	if config.IsAPIOnly() {
-		logger.Warning("Running in API-only mode: panel UI/WebSocket/login routes disabled; use Authorization: Bearer with XUI_API_SECRET or database API tokens.")
+		logger.Warning("Running in API-only mode: browser UI/WebSocket/login routes disabled; use Authorization: Bearer with XUI_API_SECRET or database API tokens.")
 		if secret := config.GetAPISecret(); secret != "" {
-			logger.Infof("XUI_API_SECRET is set (%d bytes). REST base path includes /panel/api per wiki.", len(secret))
+			logger.Infof("XUI_API_SECRET is set (%d bytes). REST endpoints are under `/panel/api/...` beneath the configured web root path.", len(secret))
 		} else {
 			logger.Warning("XUI_API_SECRET is empty — use database API tokens or set XUI_API_SECRET in EnvironmentFile (/etc/default/x-ui).")
 		}

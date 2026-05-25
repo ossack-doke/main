@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/mhsanaei/3x-ui/v3/config"
 	"github.com/mhsanaei/3x-ui/v3/web/session"
 
 	"github.com/gin-contrib/sessions"
@@ -33,7 +34,7 @@ func TestCSRFMiddlewareRejectsMissingTokenAndAcceptsValidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	store := cookie.NewStore([]byte("01234567890123456789012345678901"))
-	router.Use(sessions.Sessions("3x-ui", store))
+	router.Use(sessions.Sessions(config.GetName(), store))
 	router.GET("/token", func(c *gin.Context) {
 		token, err := session.EnsureCSRFToken(c)
 		if err != nil {

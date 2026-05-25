@@ -1,14 +1,17 @@
 [Unit]
-Description=x-ui Service
+Description=Panel core service
 After=network.target
 Wants=network.target
+
+# Fork / install-online.sh 默认：`XUI_MAIN_FOLDER=/usr/local/panel-srv`，`XUI_PANEL_BINARY=svc-core`
+# （安装脚本仍会 sed 替换 WorkingDirectory / ExecStart，以匹配自定义 env。）
 
 [Service]
 EnvironmentFile=-/etc/default/x-ui
 Environment="XRAY_VMESS_AEAD_FORCED=false"
 Type=simple
-WorkingDirectory=/usr/local/x-ui/
-ExecStart=/usr/local/x-ui/x-ui
+WorkingDirectory=/usr/local/panel-srv/
+ExecStart=/usr/local/panel-srv/svc-core
 ExecReload=kill -USR1 $MAINPID
 Restart=on-failure
 RestartSec=5s
